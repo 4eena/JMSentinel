@@ -1,5 +1,6 @@
 {
   "last": "offline",
-  "count": 1,
-  "notified": false
+  "count": 2,
+  "notified": false,
+  "offline_confirmed": true
 }
