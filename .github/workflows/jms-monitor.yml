@@ -52,12 +52,16 @@ jobs:
               servers = world["data"]
               for server in servers:
                   status = server["status"]
-                  if not isinstance(status, bool):
-                      raise RuntimeError("Invalid status")
-                  if status:
+
+                  if type(status) is not int:
+                      raise RuntimeError(f"Invalid status: {status}")
+
+                  if status == 1:
                       online += 1
-                  else:
+                  elif status == 0:
                       offline += 1
+                  else:
+                      raise RuntimeError(f"Unknown status: {status}")
               print(f"{name}: {len(servers)} servers")
 
           if online + offline == 0:
