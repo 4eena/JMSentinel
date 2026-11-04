@@ -1,6 +1,7 @@
 
 import json
 import os
+import urllib.parse
 import urllib.request
 from pathlib import Path
 
@@ -23,17 +24,20 @@ def get_status():
     with urllib.request.urlopen(req, timeout=20) as response:
         worlds = json.load(response)
 
+    if not isinstance(worlds, list) or not worlds:
+        raise RuntimeError("Invalid API response")
+
     statuses = [
         server["status"]
         for world in worlds
         for server in world["data"]
     ]
 
-    if not statuses:
-        raise RuntimeError("No server data")
-
-    if any(type(s) is not int or s not in (0, 1) for s in statuses):
-        raise RuntimeError("Unknown server status")
+    if not statuses or any(
+        type(s) is not int or s not in (0, 1)
+        for s in statuses
+    ):
+        raise RuntimeError("Invalid server status")
 
     # 0=offline, 1=online は暫定
     return "online" if any(s == 1 for s in statuses) else "offline"
@@ -58,11 +62,15 @@ def send_telegram():
 
 
 def main():
-    state = (
-        json.loads(STATE_FILE.read_text())
-        if STATE_FILE.exists()
-        else {"last": None, "count": 0, "notified": False}
-    )
+    if STATE_FILE.exists():
+        state = json.loads(STATE_FILE.read_text())
+    else:
+        state = {}
+
+    state.setdefault("last", None)
+    state.setdefault("count", 0)
+    state.setdefault("notified", True)
+    state.setdefault("offline_confirmed", False)
 
     current = get_status()
 
@@ -73,26 +81,30 @@ def main():
         state["count"] = 1
 
     if current == "offline" and state["count"] >= 2:
+        state["offline_confirmed"] = True
         state["notified"] = False
 
     if current == "online" and state["count"] >= 2:
-        if not state.get("offline_confirmed", False):
-            state["notified"] = True
+        if (
+            state["offline_confirmed"]
+            and not state["notified"]
+        ):
+            if os.environ.get("ENABLE_NOTIFICATIONS") == "true":
+                send_telegram()
+                state["notified"] = True
+                state["offline_confirmed"] = False
 
-    if current == "offline" and state["count"] >= 2:
-        state["offline_confirmed"] = True
+    STATE_FILE.write_text(
+        json.dumps(state, indent=2),
+        encoding="utf-8",
+    )
 
-    if (
-        current == "online"
-        and state["count"] >= 2
-        and not state["notified"]
-    ):
-        if os.environ.get("ENABLE_NOTIFICATIONS") == "true":
-            send_telegram()
-            state["notified"] = True
-
-    STATE_FILE.write_text(json.dumps(state, indent=2))
-    print(f"Status: {current}, count: {state['count']}")
+    print(
+        f"Status: {current}, "
+        f"count: {state['count']}, "
+        f"offline_confirmed: {state['offline_confirmed']}, "
+        f"notified: {state['notified']}"
+    )
 
 
 if __name__ == "__main__":
