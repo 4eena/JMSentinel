@@ -4,7 +4,8 @@ name: JMS Monitor
 on:
   workflow_dispatch:
   schedule:
-    - cron: '2-59/5 * * * *'
+  - cron: '2-59/5 * * * *'
+  - cron: '4-59/5 * * * *'
 
 permissions:
   contents: write
