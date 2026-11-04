@@ -1,0 +1,59 @@
+
+name: JMS Monitor
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '*/5 * * * *'
+
+permissions:
+  contents: read
+
+jobs:
+  monitor:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+
+    steps:
+      - name: Check JMS servers
+        env:
+          BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: |
+          python3 - <<'PY'
+          import json
+          import os
+          import urllib.request
+
+          url = (
+              "https://maplestatus.info/api/games/"
+              "maplestory/japan/worlds/servers"
+          )
+
+          with urllib.request.urlopen(url, timeout=20) as r:
+              worlds = json.load(r)
+
+          if not isinstance(worlds, list) or not worlds:
+              raise RuntimeError("Invalid API response")
+
+          online = 0
+          offline = 0
+
+          for world in worlds:
+              name = world["info"]["name"]
+              servers = world["data"]
+              for server in servers:
+                  status = server["status"]
+                  if not isinstance(status, bool):
+                      raise RuntimeError("Invalid status")
+                  if status:
+                      online += 1
+                  else:
+                      offline += 1
+              print(f"{name}: {len(servers)} servers")
+
+          if online + offline == 0:
+              raise RuntimeError("No servers found")
+
+          print(f"Online: {online}, Offline: {offline}")
+          PY
