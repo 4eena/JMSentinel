@@ -72,8 +72,15 @@ def main():
         state["last"] = current
         state["count"] = 1
 
-    if current == "offline":
+    if current == "offline" and state["count"] >= 2:
         state["notified"] = False
+
+    if current == "online" and state["count"] >= 2:
+        if not state.get("offline_confirmed", False):
+            state["notified"] = True
+
+    if current == "offline" and state["count"] >= 2:
+        state["offline_confirmed"] = True
 
     if (
         current == "online"
